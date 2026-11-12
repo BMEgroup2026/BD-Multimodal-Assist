@@ -103,7 +103,7 @@ if __name__ == "__main__":
     
     # 2. 实例化规则引擎 (14天基线, Z<-1.5触发, 连续3天确认)
     engine = LayeredMonitorRule(baseline_window=14, trigger_z=-1.5, consecutive_days=3)
-    
+    #注：当前 baseline_window=14, trigger_z=-1.5, consecutive_days=3 为基于可穿戴设备工程经验与文献参考的初始默认值。在 Phase 3 将基于数据分布进行网格搜索优化。
     # 3. 运行模拟
     result_df = engine.run_simulation(test_df)
     

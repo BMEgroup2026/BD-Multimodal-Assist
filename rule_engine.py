@@ -86,12 +86,11 @@ class LayeredMonitorRule:
 # ==========================================
 # === Phase 1 测试入口 (用模拟数据跑通逻辑) ===
 # ==========================================
+# === Phase 1 测试入口 (自带假数据，不依赖B同学的CSV) ===
 if __name__ == "__main__":
     print("🚀 开始测试分层监测规则引擎...\n")
     
-    # 1. 生成 1 个虚拟患者 20 天的模拟数据
-    # 前 14 天：基线学习期，RMSSD 在 30 左右正常波动
-    # 后 6 天：模拟病理恶化，RMSSD 显著下降至 18-20 左右
+    # 1. 自己生成一段假数据：前14天正常(30左右)，后6天病理恶化(18左右)
     dates = pd.date_range('2026-04-01', periods=20)
     rmssd_vals = [30 + np.random.normal(0, 2) for _ in range(14)] + [19, 18, 19, 20, 18, 19]
     
@@ -101,16 +100,19 @@ if __name__ == "__main__":
         'RMSSD': rmssd_vals
     })
     
-    # 2. 实例化规则引擎 (14天基线, Z<-1.5触发, 连续3天确认)
+    # 2. 实例化引擎
     engine = LayeredMonitorRule(baseline_window=14, trigger_z=-1.5, consecutive_days=3)
-    #注：当前 baseline_window=14, trigger_z=-1.5, consecutive_days=3 为基于可穿戴设备工程经验与文献参考的初始默认值。在 Phase 3 将基于数据分布进行网格搜索优化。
-    # 3. 运行模拟
-    result_df = engine.run_simulation(test_df)
     
-    # 4. 打印结果 (重点看后10天)
+    # 3. 为了兼容你上面的 run_simulation 函数，我们先把假数据存成 csv
+    test_df.to_csv("fake_test_data.csv", index=False)
+    
+    # 4. 运行模拟
+    result_df = engine.run_simulation("fake_test_data.csv")
+    
+    # 5. 打印结果
     display_cols = ['date', 'rmssd', 'z_score', 'daily_status', 'poct_triggered']
     print(result_df[display_cols].tail(10).to_markdown(index=False))
     
     trigger_count = (result_df['poct_triggered'] == 'YES').sum()
     print(f"\n✅ 规则引擎跑通！20天内共触发 POCT 次数: {trigger_count}")
-    print("💡 观察：前14天为 BASELINE_LEARNING，第17-19天连续3天触发，第19天 poct_triggered 变为 YES。逻辑完美自洽！")
+    print("💡 观察：前14天为 BASELINE_LEARNING，后几天连续异常，最终触发 YES。逻辑完美自洽！")

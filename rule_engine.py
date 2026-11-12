@@ -87,32 +87,39 @@ class LayeredMonitorRule:
 # === Phase 1 测试入口 (用模拟数据跑通逻辑) ===
 # ==========================================
 # === Phase 1 测试入口 (自带假数据，不依赖B同学的CSV) ===
+import os  # 记得在文件最开头加上 import os
+
+# ... (中间的 class LayeredMonitorRule 代码完全不用动) ...
+
+# ==========================================
+# === 智能兼容测试入口 (工程级写法) ===
+# ==========================================
 if __name__ == "__main__":
-    print("🚀 开始测试分层监测规则引擎...\n")
+    csv_path = "bipolar_synthetic_data.csv"
     
-    # 1. 自己生成一段假数据：前14天正常(30左右)，后6天病理恶化(18左右)
-    dates = pd.date_range('2026-04-01', periods=20)
-    rmssd_vals = [30 + np.random.normal(0, 2) for _ in range(14)] + [19, 18, 19, 20, 18, 19]
-    
-    test_df = pd.DataFrame({
-        'patient_id': 1001,
-        'date': dates,
-        'RMSSD': rmssd_vals
-    })
-    
-    # 2. 实例化引擎
-    engine = LayeredMonitorRule(baseline_window=14, trigger_z=-1.5, consecutive_days=3)
-    
-    # 3. 为了兼容你上面的 run_simulation 函数，我们先把假数据存成 csv
-    test_df.to_csv("fake_test_data.csv", index=False)
-    
-    # 4. 运行模拟
-    result_df = engine.run_simulation("fake_test_data.csv")
-    
-    # 5. 打印结果
+    # 1. 智能判断：B同学的文件在不在？
+    if os.path.exists(csv_path):
+        print(f"✅ 检测到 B 同学的数据文件 '{csv_path}'，开始正式联调测试...\n")
+        engine = LayeredMonitorRule(baseline_window=14, trigger_z=-1.5, consecutive_days=3)
+        result_df = engine.run_simulation(csv_path)
+    else:
+        print(f"⚠️ 未找到 '{csv_path}'，自动启动 Mock (模拟) 数据演示模式...\n")
+        # 自动生成一段假数据：前14天正常，后6天病理恶化
+        dates = pd.date_range('2026-04-01', periods=20)
+        rmssd_vals = [30 + np.random.normal(0, 2) for _ in range(14)] + [19, 18, 19, 20, 18, 19]
+        test_df = pd.DataFrame({'patient_id': 1001, 'date': dates, 'RMSSD': rmssd_vals})
+        
+        # 存为临时文件以适配 run_simulation 的接口
+        temp_csv = "temp_mock_data.csv"
+        test_df.to_csv(temp_csv, index=False)
+        
+        engine = LayeredMonitorRule(baseline_window=14, trigger_z=-1.5, consecutive_days=3)
+        result_df = engine.run_simulation(temp_csv)
+        os.remove(temp_csv) # 跑完后自动清理垃圾文件
+
+    # 2. 统一打印结果
     display_cols = ['date', 'rmssd', 'z_score', 'daily_status', 'poct_triggered']
     print(result_df[display_cols].tail(10).to_markdown(index=False))
     
     trigger_count = (result_df['poct_triggered'] == 'YES').sum()
-    print(f"\n✅ 规则引擎跑通！20天内共触发 POCT 次数: {trigger_count}")
-    print("💡 观察：前14天为 BASELINE_LEARNING，后几天连续异常，最终触发 YES。逻辑完美自洽！")
+    print(f"\n🎉 测试完成！共触发 POCT 次数: {trigger_count}")
